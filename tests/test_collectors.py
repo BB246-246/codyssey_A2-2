@@ -392,3 +392,60 @@ def test_naver_items_flow_into_storage(storage, app_config, naver_source, sample
     # 추적 파라미터(utm_source)는 canonical URL에서 제거된다
     assert all("utm_source" not in r["url"] for r in rows)
     assert rows[0]["published_at"].startswith("2026-08-10T00:00:00")
+
+
+def test_placeholder_credentials_are_rejected(naver_source, monkeypatch):
+    """문서의 '<Client ID>' 예시를 그대로 환경변수에 넣은 경우를 잡아낸다."""
+    from news_cli.collectors.base import resolve_auth_headers
+
+    monkeypatch.setenv("NAVER_CLIENT_ID", "<Client ID>")
+    monkeypatch.setenv("NAVER_CLIENT_SECRET", "<Client Secret>")
+    with pytest.raises(FetchError) as excinfo:
+        resolve_auth_headers(naver_source)
+    assert "자리표시자" in str(excinfo.value)
+
+
+def test_authenticated_api_skips_robots_check(naver_source, sample_naver_xml, monkeypatch):
+    """공식 API 호스트가 robots.txt로 크롤러를 막아도 인증 호출은 진행한다."""
+    monkeypatch.setenv("NAVER_CLIENT_ID", "abcd1234EFGH5678ijkl")
+    monkeypatch.setenv("NAVER_CLIENT_SECRET", "AbCdEfGhIj")
+
+    mapping = {
+        "https://openapi.naver.test/robots.txt": FakeResponse("User-agent: *\nDisallow: /\n"),
+    }
+    fetcher = make_fetcher(mapping, default=FakeResponse(sample_naver_xml), respect_robots=True)
+    result = rss_collect(naver_source, fetcher, limit=3)
+
+    assert len(result.items) == 3, "인증된 API 호출이 robots.txt로 막히면 안 됩니다"
+    assert result.errors == []
+
+
+def test_crawling_still_honors_robots(web_source, sample_list_html):
+    """크롤링 경로에서는 robots.txt 차단이 그대로 적용되어야 한다."""
+    mapping = {
+        "https://example.test/robots.txt": FakeResponse("User-agent: *\nDisallow: /\n"),
+        web_source.list_url: FakeResponse(sample_list_html),
+    }
+    result = web_collect(web_source, make_fetcher(mapping, respect_robots=True), limit=2)
+    assert result.items == []
+    assert "robots.txt" in result.errors[0][1]
+
+
+def test_unauthenticated_rss_still_honors_robots(rss_source, sample_feed_text):
+    mapping = {
+        "https://example.test/robots.txt": FakeResponse("User-agent: *\nDisallow: /\n"),
+        rss_source.url: FakeResponse(sample_feed_text),
+    }
+    result = rss_collect(rss_source, make_fetcher(mapping, respect_robots=True), limit=2)
+    assert result.items == []
+    assert "robots.txt" in result.errors[0][1]
+
+
+def test_http_error_includes_response_body_for_diagnosis():
+    """API가 본문에 담아 주는 실패 사유를 오류 메시지에 포함한다."""
+    body = '{"errorMessage":"Scope Status Invalid : Authentication failed.","errorCode":"024"}'
+    fetcher = make_fetcher({"https://api.test/x": FakeResponse(body, status_code=401)})
+    with pytest.raises(FetchError) as excinfo:
+        fetcher.get("https://api.test/x")
+    message = str(excinfo.value)
+    assert "401" in message and "Scope Status Invalid" in message

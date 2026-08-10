@@ -144,13 +144,19 @@ class HttpFetcher:
         *,
         respect_delay: bool = True,
         headers: dict[str, str] | None = None,
+        check_robots: bool = True,
     ) -> requests.Response:
         """GET 요청. 실패 시 FetchError를 던진다.
 
         `headers`는 인증 헤더처럼 요청별로 다른 값을 넘길 때 사용한다.
         값은 로그에 남기지 않는다(헤더 이름만 기록).
+
+        `check_robots=False`는 robots.txt 확인을 건너뛴다. robots.txt는 크롤러를
+        대상으로 한 규약이므로, 제공자가 발급한 자격증명으로 호출하는 공식 API
+        엔드포인트에는 적용하지 않는다(그쪽은 API 이용약관을 따른다).
+        크롤링 경로에서는 절대 False로 두지 않는다.
         """
-        if not self.is_allowed(url):
+        if check_robots and not self.is_allowed(url):
             raise RobotsDisallowed(f"robots.txt가 수집을 허용하지 않습니다: {url}")
 
         if respect_delay:
@@ -169,7 +175,18 @@ class HttpFetcher:
             self._last_request_at = time.monotonic()
 
         if response.status_code >= 400:
-            raise FetchError(f"HTTP {response.status_code} 응답: {url}")
+            # API는 실패 원인을 본문에 담아 준다. 그대로 버리면 401만 보이고
+            # 무엇이 잘못됐는지 알 수 없으므로 앞부분을 함께 알린다.
+            detail = ""
+            try:
+                if not response.encoding or response.encoding.lower() == "iso-8859-1":
+                    response.encoding = response.apparent_encoding or "utf-8"
+                snippet = " ".join((response.text or "").split())[:200]
+                if snippet:
+                    detail = f" | 응답: {snippet}"
+            except Exception:  # pragma: no cover - 본문 읽기 실패는 무시
+                pass
+            raise FetchError(f"HTTP {response.status_code} 응답: {url}{detail}")
         return response
 
     def get_text(
@@ -178,8 +195,11 @@ class HttpFetcher:
         *,
         respect_delay: bool = True,
         headers: dict[str, str] | None = None,
+        check_robots: bool = True,
     ) -> str:
-        response = self.get(url, respect_delay=respect_delay, headers=headers)
+        response = self.get(
+            url, respect_delay=respect_delay, headers=headers, check_robots=check_robots
+        )
         if not response.encoding or response.encoding.lower() == "iso-8859-1":
             response.encoding = response.apparent_encoding or "utf-8"
         return response.text
@@ -191,6 +211,14 @@ class HttpFetcher:
             pass
 
 
+def _looks_like_placeholder(value: str) -> bool:
+    """'<Client ID>'처럼 문서의 예시 문구를 그대로 넣은 경우를 감지한다."""
+    stripped = value.strip()
+    if stripped.startswith("<") and stripped.endswith(">"):
+        return True
+    return stripped.upper().startswith(("REPLACE_WITH", "YOUR_", "<발급"))
+
+
 def resolve_auth_headers(source: Any) -> dict[str, str]:
     """source.auth_header_env의 '환경변수 이름'을 실제 값으로 바꾼다.
 
@@ -200,20 +228,32 @@ def resolve_auth_headers(source: Any) -> dict[str, str]:
     mapping = getattr(source, "auth_header_env", None) or {}
     headers: dict[str, str] = {}
     missing: list[str] = []
+    placeholder: list[str] = []
 
     for header, env_name in mapping.items():
         value = os.environ.get(env_name, "").strip()
         if not value:
             missing.append(env_name)
+        elif _looks_like_placeholder(value):
+            placeholder.append(env_name)
         else:
             headers[header] = value
+
+    if placeholder:
+        raise FetchError(
+            f"환경변수에 실제 값 대신 예시 자리표시자가 들어 있습니다: {', '.join(placeholder)}\n"
+            f"'<...>' 꺾쇠는 '여기에 발급받은 값을 넣으라'는 표시입니다. 꺾쇠 없이 값만 넣으세요.\n"
+            f"  예)  setx {placeholder[0]} abcd1234EFGH5678ijkl"
+        )
 
     if missing:
         names = ", ".join(missing)
         raise FetchError(
             f"소스 '{getattr(source, 'name', '?')}'에 필요한 환경변수가 설정되어 있지 않습니다: {names}\n"
-            f"  PowerShell:  setx {missing[0]} \"<발급받은 값>\"  (설정 후 새 터미널에서 실행)\n"
-            f"  bash:        export {missing[0]}='<발급받은 값>'"
+            f"  PowerShell:  setx {missing[0]} 발급받은값     (꺾쇠 없이 실제 값만)\n"
+            f"  bash:        export {missing[0]}=발급받은값\n"
+            f"setx로 설정했다면 터미널만 새로 여는 것으로는 부족합니다. "
+            f"VS Code 등 편집기를 쓰는 경우 편집기를 완전히 재시작해야 반영됩니다."
         )
 
     if headers:

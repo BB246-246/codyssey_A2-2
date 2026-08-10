@@ -128,9 +128,21 @@ def collect(source: SourceConfig, fetcher: HttpFetcher, *, limit: int | None = N
         result.errors.append((source.url or source.name, str(exc)))
         return result
 
+    # 자격증명을 요구하는 공식 API는 robots.txt가 아니라 API 이용약관의 적용을 받는다.
+    # (예: openapi.naver.com/robots.txt는 크롤러를 막기 위해 Disallow: / 이지만,
+    #  발급받은 Client ID/Secret으로 호출하는 것은 제공자가 의도한 사용 방식이다.)
+    is_authenticated_api = bool(headers)
+    if is_authenticated_api:
+        logger.info("인증된 API 호출이므로 robots.txt 검사를 건너뜁니다: %s", urlsplit(url).netloc)
+
     logger.info("RSS 수집 시작: source=%s url=%s limit=%s", source.name, url, limit)
     try:
-        content = fetcher.get_text(url, respect_delay=False, headers=headers or None)
+        content = fetcher.get_text(
+            url,
+            respect_delay=False,
+            headers=headers or None,
+            check_robots=not is_authenticated_api,
+        )
     except FetchError as exc:
         logger.error("RSS 다운로드 실패: %s", exc)
         result.errors.append((url, str(exc)))
