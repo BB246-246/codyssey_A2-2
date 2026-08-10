@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>테스트 목록 페이지</title></head>
+<body>
+  <div id="mw-pages">
+    <div class="mw-category-group">
+      <ul>
+        <li><a href="/wiki/article-1">첫 번째 기사</a></li>
+        <li><a href="/wiki/article-2">두 번째 기사</a></li>
+        <li><a href="/wiki/article-2">두 번째 기사(중복 링크)</a></li>
+        <li><a href="/wiki/article-3">세 번째 기사</a></li>
+        <li><a href="#anchor-only">앵커 링크(무시되어야 함)</a></li>
+        <li><a>href 없는 링크(무시되어야 함)</a></li>
+      </ul>
+    </div>
+  </div>
+  <div id="sidebar">
+    <ul><li><a href="/wiki/should-not-match">사이드바 링크(선택자 밖)</a></li></ul>
+  </div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>테스트 AI 뉴스 피드</title>
+    <link>https://example.test/feed</link>
+    <description>단위 테스트용 고정 RSS 피드</description>
+    <language>ko</language>
+    <item>
+      <title>오픈소스 LLM이 기업 도입을 가속한다</title>
+      <link>https://example.test/news/1?utm_source=rss&amp;utm_medium=feed#top</link>
+      <guid isPermaLink="false">example-news-1</guid>
+      <pubDate>Mon, 04 Aug 2026 09:30:00 +0000</pubDate>
+      <category>AI</category>
+      <description>&lt;p&gt;국내외 기업들이 &lt;b&gt;오픈소스 LLM&lt;/b&gt;을 도입해 비용을 절감하고 있다.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>반도체 수요 회복, AI 서버가 견인</title>
+      <link>https://example.test/news/2</link>
+      <guid isPermaLink="false">example-news-2</guid>
+      <pubDate>Tue, 05 Aug 2026 01:00:00 +0000</pubDate>
+      <category>IT</category>
+      <description>AI 서버 수요가 늘면서 메모리 반도체 가격이 반등했다.</description>
+    </item>
+    <item>
+      <title>제목만 있고 본문이 없는 기사</title>
+      <link>https://example.test/news/3</link>
+      <guid isPermaLink="false">example-news-3</guid>
+      <pubDate>Wed, 06 Aug 2026 12:00:00 +0000</pubDate>
+      <category>IT</category>
+    </item>
+    <item>
+      <title>링크가 없는 잘못된 항목</title>
+      <description>이 항목은 link가 없어 건너뛰어야 한다.</description>
+    </item>
+  </channel>
+</rss>

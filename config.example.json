@@ -1,0 +1,36 @@
+{
+  "database_path": "data/news.db",
+  "log_path": "logs/app.log",
+  "request_timeout_seconds": 10,
+  "request_delay_seconds": 1.0,
+  "duplicate_policy": "skip",
+  "default_ai_model": "gpt-4o-mini",
+  "user_agent": "ai-news-cli/1.0 (+educational CLI project; contact: your-email@example.com)",
+  "respect_robots_txt": true,
+  "summary_language": "Korean",
+  "max_analysis_articles": 50,
+  "max_analysis_chars": 20000,
+  "max_body_chars_for_ai": 4000,
+  "sources": {
+    "default_rss": {
+      "type": "rss",
+      "url": "https://hnrss.org/frontpage",
+      "category": "IT"
+    },
+    "ai_rss": {
+      "type": "rss",
+      "url": "https://hnrss.org/newest?q=AI&count=25",
+      "category": "AI"
+    },
+    "default_web": {
+      "type": "web",
+      "list_url": "https://en.wikinews.org/wiki/Category:Science_and_technology",
+      "base_url": "https://en.wikinews.org",
+      "article_link_selector": "#mw-pages .mw-category-group li a",
+      "title_selector": "h1#firstHeading",
+      "body_selector": "#mw-content-text .mw-parser-output p",
+      "date_selector": "strong.published",
+      "category": "Science"
+    }
+  }
+}

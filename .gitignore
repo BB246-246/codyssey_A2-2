@@ -1,0 +1,35 @@
+# --- secrets / local settings ---
+.env
+.env.*
+config.json
+
+# --- generated data ---
+data/
+logs/
+output/charts/
+output/reports/
+output/exports/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.log.*
+
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- virtualenv ---
+.venv/
+venv/
+env/
+
+# --- editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

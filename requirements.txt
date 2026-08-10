@@ -1,0 +1,10 @@
+requests>=2.31
+feedparser>=6.0
+beautifulsoup4>=4.12
+lxml>=5.0
+matplotlib>=3.8
+pandas>=2.1
+openpyxl>=3.1
+openai>=1.30
+pytest>=8.0
+pytest-cov>=5.0
