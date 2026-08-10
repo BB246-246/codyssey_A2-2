@@ -316,9 +316,10 @@ python -m pytest --cov=news_cli --cov-report=term-missing
 
 ## 14. 알려진 제한
 
-- **실제 상용 AI API로는 검증하지 않았습니다.** `AI_API_KEY`가 없는 환경에서 개발했기 때문에
-  `summarize`/`analyze`는 로컬 OpenAI 호환 stub 서버로만 end-to-end 확인했습니다.
-  실제 공급자의 rate limit, 토큰 한도 초과, `response_format` 미지원 모델 등은 미검증입니다.
+- **검증한 공급자는 Gemini 하나뿐입니다.** 다른 OpenAI 호환 API는 실행해 보지 않았고,
+  `analyze`가 보내는 `response_format: {"type": "json_object"}`를 지원하지 않는
+  모델에서는 실패할 수 있습니다.
+- rate limit·토큰 한도 초과 같은 이상 경로는 미검증이며, 실패 시 재시도하지 않습니다.
 - 요약·분석 품질은 모델과 프롬프트에 좌우됩니다. 프롬프트는 "기사에 없는 사실 추가 금지"를
   명시하지만, 모델의 환각을 코드로 완전히 막지는 못합니다.
 - 크롤링은 **정적 HTML만** 지원합니다. JavaScript로 렌더링되는 사이트는 수집할 수 없습니다.

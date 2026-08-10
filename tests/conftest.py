@@ -19,6 +19,17 @@ from news_cli.storage import Storage  # noqa: E402
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+@pytest.fixture(autouse=True)
+def isolate_ai_env(monkeypatch):
+    """실행 환경의 AI_* 환경변수가 테스트에 새어 들어오지 않게 한다.
+
+    개발자 머신에 실제 키/모델이 설정돼 있어도 테스트 결과가 달라지면 안 되므로
+    모든 테스트에서 기본적으로 제거하고, 필요한 테스트만 명시적으로 설정한다.
+    """
+    for name in ("AI_API_KEY", "AI_BASE_URL", "AI_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+
+
 @pytest.fixture
 def fixtures_dir() -> Path:
     return FIXTURES

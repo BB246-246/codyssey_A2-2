@@ -153,10 +153,11 @@ def build_ai_client(config: Any = None, *, model: str | None = None) -> BaseAICl
     api_key = os.environ.get(ENV_API_KEY, "").strip()
     if not api_key:
         raise AIConfigError(
-            f"환경변수 {ENV_API_KEY}가 필요합니다.\n"
-            f"  PowerShell:  $env:{ENV_API_KEY} = 'sk-...'\n"
-            f"  bash:        export {ENV_API_KEY}='sk-...'\n"
-            f"선택적으로 {ENV_BASE_URL}, {ENV_MODEL}도 설정할 수 있습니다."
+            f"환경변수 {ENV_API_KEY}가 설정되어 있지 않습니다.\n"
+            f"  PowerShell:  $env:{ENV_API_KEY} = '<API 키>'\n"
+            f"  bash:        export {ENV_API_KEY}='<API 키>'\n"
+            f"(setx로 설정했다면 새 터미널에서 실행하세요. "
+            f"필요 시 {ENV_BASE_URL}, {ENV_MODEL}도 설정합니다.)"
         )
 
     base_url = os.environ.get(ENV_BASE_URL, "").strip() or None
