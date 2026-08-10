@@ -18,7 +18,7 @@ CLI (argparse)
   └─ export     → CSV / JSONL / Excel
 ```
 
-부가 명령: `list`(필터·페이지네이션 조회), `show --id`(상세 보기).
+부가 명령: `list`(필터·페이지네이션 조회), `show --id`(상세 보기). 구현 상세는 [docs/list-show.md](docs/list-show.md) 참고.
 
 ## 2. 요구 사항
 
