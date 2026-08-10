@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Naver Open API - news ::'AI'</title>
+    <link>https://search.naver.com</link>
+    <description>Naver Open API - news search result</description>
+    <lastBuildDate>Mon, 10 Aug 2026 14:00:00 +0900</lastBuildDate>
+    <total>123456</total>
+    <start>1</start>
+    <display>3</display>
+    <item>
+      <title>국내 기업 &lt;b&gt;AI&lt;/b&gt; 반도체 투자 확대…&amp;quot;내년 두 배&amp;quot;</title>
+      <originallink>https://www.example-press.co.kr/view/2026081012345</originallink>
+      <link>https://n.news.naver.com/mnews/article/001/0012345678</link>
+      <description>국내 주요 기업들이 &lt;b&gt;AI&lt;/b&gt; 반도체 생산 설비에 대규모 투자를 발표했다. 업계는 내년까지...</description>
+      <pubDate>Mon, 10 Aug 2026 13:20:00 +0900</pubDate>
+    </item>
+    <item>
+      <title>오픈소스 &lt;b&gt;AI&lt;/b&gt; 모델, 기업 도입 가속</title>
+      <originallink>https://www.example-daily.com/article/98765?utm_source=naver</originallink>
+      <link>https://n.news.naver.com/mnews/article/002/0009876543</link>
+      <description>비용 절감을 이유로 오픈소스 모델을 채택하는 기업이 늘고 있다.</description>
+      <pubDate>Mon, 10 Aug 2026 11:05:00 +0900</pubDate>
+    </item>
+    <item>
+      <title>originallink 없이 link만 있는 기사</title>
+      <link>https://n.news.naver.com/mnews/article/003/0001112223</link>
+      <description>포털 주소만 제공되는 경우를 확인하기 위한 항목.</description>
+      <pubDate>Mon, 10 Aug 2026 09:00:00 +0900</pubDate>
+    </item>
+  </channel>
+</rss>

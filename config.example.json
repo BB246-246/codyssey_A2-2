@@ -14,23 +14,41 @@
   "sources": {
     "default_rss": {
       "type": "rss",
-      "url": "https://hnrss.org/frontpage",
-      "category": "IT"
-    },
-    "ai_rss": {
-      "type": "rss",
-      "url": "https://hnrss.org/newest?q=AI&count=25",
+      "url": "https://openapi.naver.com/v1/search/news.xml",
+      "params": {
+        "query": "AI",
+        "display": 20,
+        "sort": "date"
+      },
+      "auth_header_env": {
+        "X-Naver-Client-Id": "NAVER_CLIENT_ID",
+        "X-Naver-Client-Secret": "NAVER_CLIENT_SECRET"
+      },
       "category": "AI"
+    },
+    "naver_it": {
+      "type": "rss",
+      "url": "https://openapi.naver.com/v1/search/news.xml",
+      "params": {
+        "query": "반도체",
+        "display": 20,
+        "sort": "date"
+      },
+      "auth_header_env": {
+        "X-Naver-Client-Id": "NAVER_CLIENT_ID",
+        "X-Naver-Client-Secret": "NAVER_CLIENT_SECRET"
+      },
+      "category": "IT"
     },
     "default_web": {
       "type": "web",
-      "list_url": "https://en.wikinews.org/wiki/Category:Science_and_technology",
-      "base_url": "https://en.wikinews.org",
-      "article_link_selector": "#mw-pages .mw-category-group li a",
-      "title_selector": "h1#firstHeading",
-      "body_selector": "#mw-content-text .mw-parser-output p",
-      "date_selector": "strong.published",
-      "category": "Science"
+      "list_url": "https://zdnet.co.kr/news/?lstcode=0050",
+      "base_url": "https://zdnet.co.kr",
+      "article_link_selector": "a[href*=\"/view/?no=\"]",
+      "title_selector": "h1",
+      "body_selector": ".view_cont p",
+      "date_selector": "meta[property=\"article:published_time\"]",
+      "category": "IT"
     }
   }
 }

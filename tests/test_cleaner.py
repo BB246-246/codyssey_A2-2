@@ -244,3 +244,20 @@ def test_clean_respects_limit(storage):
 def test_clean_rejects_bad_policy(storage):
     with pytest.raises(CleanError):
         clean_articles(storage, duplicate_policy="merge")
+
+@pytest.mark.parametrize(
+    "raw,prefix",
+    [
+        ("반도체ㆍ디스플레이 입력 :2026/08/10 00:41    수정: 2026/08/10 09:43", "2026-08-10T00:41:00"),
+        ("입력 2026.08.09 20:25", "2026-08-09T20:25:00"),
+        ("등록일 2026/08/10", "2026-08-10T00:00:00"),
+    ],
+)
+def test_normalize_date_extracts_from_noisy_text(raw, prefix):
+    """언론사 페이지의 '입력 :날짜 수정: 날짜' 형태에서 발행일을 뽑아낸다."""
+    assert normalize_date(raw).startswith(prefix)
+
+
+def test_double_encoded_html_entities_are_fully_stripped():
+    """네이버 뉴스 검색 API처럼 태그를 '&lt;b&gt;'로 주는 경우."""
+    assert normalize_text("국내 &lt;b&gt;AI&lt;/b&gt; 투자 &amp;quot;확대&amp;quot;") == '국내 AI 투자 "확대"'

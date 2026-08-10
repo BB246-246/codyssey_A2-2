@@ -284,3 +284,111 @@ def test_run_fetch_crawl(storage, app_config, sample_list_html, sample_article_h
     assert stats.attempted == 3
     assert stats.succeeded == 3
     assert stats.failed == 0
+
+# ---------------------------------------------------------------------------
+# 인증이 필요한 검색 API (네이버 뉴스 검색) — fixture/mock만 사용
+# ---------------------------------------------------------------------------
+def test_build_request_url_merges_params(naver_source):
+    from news_cli.collectors.rss_collector import build_request_url
+
+    url = build_request_url(naver_source)
+    assert url.startswith("https://openapi.naver.test/v1/search/news.xml?")
+    assert "query=AI" in url and "sort=date" in url and "display=20" in url
+
+
+def test_build_request_url_limit_overrides_display(naver_source):
+    from news_cli.collectors.rss_collector import build_request_url
+
+    assert "display=5" in build_request_url(naver_source, limit=5)
+    # 네이버 API 상한(100)을 넘지 않는다
+    assert "display=100" in build_request_url(naver_source, limit=500)
+
+
+def test_auth_headers_read_from_env(naver_source, monkeypatch):
+    from news_cli.collectors.base import resolve_auth_headers
+
+    monkeypatch.setenv("NAVER_CLIENT_ID", "id-value")
+    monkeypatch.setenv("NAVER_CLIENT_SECRET", "secret-value")
+    headers = resolve_auth_headers(naver_source)
+    assert headers == {"X-Naver-Client-Id": "id-value", "X-Naver-Client-Secret": "secret-value"}
+
+
+def test_missing_auth_env_gives_actionable_error(naver_source, monkeypatch):
+    from news_cli.collectors.base import resolve_auth_headers
+
+    monkeypatch.delenv("NAVER_CLIENT_ID", raising=False)
+    monkeypatch.delenv("NAVER_CLIENT_SECRET", raising=False)
+    with pytest.raises(FetchError) as excinfo:
+        resolve_auth_headers(naver_source)
+    message = str(excinfo.value)
+    assert "NAVER_CLIENT_ID" in message and "NAVER_CLIENT_SECRET" in message
+
+
+def test_collect_sends_auth_headers(naver_source, sample_naver_xml, monkeypatch):
+    monkeypatch.setenv("NAVER_CLIENT_ID", "id-value")
+    monkeypatch.setenv("NAVER_CLIENT_SECRET", "secret-value")
+
+    captured = {}
+
+    class CapturingSession(FakeSession):
+        def get(self, url, timeout=None, headers=None, **kwargs):
+            captured["url"] = url
+            captured["headers"] = headers
+            return FakeResponse(sample_naver_xml)
+
+    fetcher = HttpFetcher(
+        user_agent="t", timeout=5, delay=0, respect_robots=False, session=CapturingSession({})
+    )
+    result = rss_collect(naver_source, fetcher, limit=3)
+
+    assert captured["headers"]["X-Naver-Client-Id"] == "id-value"
+    assert "query=AI" in captured["url"]
+    assert len(result.items) == 3
+
+
+def test_collect_fails_cleanly_without_credentials(naver_source, monkeypatch):
+    monkeypatch.delenv("NAVER_CLIENT_ID", raising=False)
+    monkeypatch.delenv("NAVER_CLIENT_SECRET", raising=False)
+
+    result = rss_collect(naver_source, make_fetcher({}), limit=3)
+    assert result.items == []
+    assert "NAVER_CLIENT_ID" in result.errors[0][1]
+
+
+def test_naver_originallink_preferred_over_portal_link(naver_source, sample_naver_xml):
+    result = parse_feed(sample_naver_xml, naver_source)
+    assert len(result.items) == 3
+    # 1·2번째는 언론사 원문 주소, 3번째는 originallink가 없어 포털 주소로 대체
+    assert result.items[0].url == "https://www.example-press.co.kr/view/2026081012345"
+    assert result.items[1].url.startswith("https://www.example-daily.com/article/98765")
+    assert result.items[2].url.startswith("https://n.news.naver.com/")
+
+
+def test_naver_double_encoded_tags_are_stripped(naver_source, sample_naver_xml):
+    from news_cli.cleaner import normalize_text
+
+    item = parse_feed(sample_naver_xml, naver_source).items[0]
+    title = normalize_text(item.title)
+    assert "<b>" not in title and "&lt;" not in title
+    assert title.startswith("국내 기업 AI 반도체 투자 확대")
+    assert '"내년 두 배"' in title
+
+
+def test_naver_items_flow_into_storage(storage, app_config, naver_source, sample_naver_xml, monkeypatch):
+    """수집 → raw 저장 → clean까지 네이버 응답이 정상 처리되는지 확인."""
+    from news_cli.cleaner import clean_articles
+
+    monkeypatch.setenv("NAVER_CLIENT_ID", "id")
+    monkeypatch.setenv("NAVER_CLIENT_SECRET", "secret")
+    fetcher = make_fetcher({}, default=FakeResponse(sample_naver_xml))
+
+    stats = run_fetch(storage, app_config, source=naver_source, method="rss", limit=3, fetcher=fetcher)
+    assert stats.succeeded == 3
+
+    clean_articles(storage, duplicate_policy="skip")
+    rows = storage.query_clean_articles()
+    assert len(rows) == 3
+    assert all("<b>" not in r["title"] for r in rows)
+    # 추적 파라미터(utm_source)는 canonical URL에서 제거된다
+    assert all("utm_source" not in r["url"] for r in rows)
+    assert rows[0]["published_at"].startswith("2026-08-10T00:00:00")

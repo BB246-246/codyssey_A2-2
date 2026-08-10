@@ -7,11 +7,12 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import feedparser
 
 from ..config import SourceConfig
-from .base import CollectedItem, CollectResult, FetchError, HttpFetcher
+from .base import CollectedItem, CollectResult, FetchError, HttpFetcher, resolve_auth_headers
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,9 @@ def parse_feed(feed_content: str | bytes, source: SourceConfig, *, limit: int | 
     for entry in entries:
         result.attempted += 1
         try:
-            url = _first_text(entry, "link", "id")
+            # 네이버 뉴스 검색 API는 언론사 원문 주소를 originallink로 준다.
+            # 포털 재게시 주소(link)보다 안정적이라 중복 판정 키로 우선 사용한다.
+            url = _first_text(entry, "originallink", "link", "id")
             if not url:
                 links = entry.get("links") or []
                 url = next((l.get("href") for l in links if l.get("href")), None)
@@ -93,18 +96,44 @@ def parse_feed(feed_content: str | bytes, source: SourceConfig, *, limit: int | 
     return result
 
 
-def collect(source: SourceConfig, fetcher: HttpFetcher, *, limit: int | None = None) -> CollectResult:
-    """실제 네트워크에서 RSS를 내려받아 파싱한다."""
+def build_request_url(source: SourceConfig, *, limit: int | None = None) -> str:
+    """소스 url에 config의 params를 붙인 최종 요청 URL을 만든다.
+
+    검색형 API(예: 네이버 뉴스 검색)는 `display`로 건수를 제어하므로,
+    params에 display가 있으면 --limit 값으로 덮어써 불필요한 조회를 줄인다.
+    """
     if not source.url:
         raise FetchError(f"RSS 소스 '{source.name}'에 url이 없습니다.")
+    if not source.params:
+        return source.url
 
-    logger.info("RSS 수집 시작: source=%s url=%s limit=%s", source.name, source.url, limit)
+    params = dict(source.params)
+    if limit is not None and "display" in params:
+        params["display"] = max(1, min(int(limit), 100))  # 네이버 API 상한 100
+
+    parts = urlsplit(source.url)
+    merged = dict(parse_qsl(parts.query, keep_blank_values=True))
+    merged.update({str(k): str(v) for k, v in params.items()})
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(merged), parts.fragment))
+
+
+def collect(source: SourceConfig, fetcher: HttpFetcher, *, limit: int | None = None) -> CollectResult:
+    """실제 네트워크에서 RSS(또는 RSS를 돌려주는 검색 API)를 내려받아 파싱한다."""
+    result = CollectResult()
     try:
-        content = fetcher.get_text(source.url, respect_delay=False)
+        url = build_request_url(source, limit=limit)
+        headers = resolve_auth_headers(source)
+    except FetchError as exc:
+        logger.error("RSS 요청 준비 실패: %s", exc)
+        result.errors.append((source.url or source.name, str(exc)))
+        return result
+
+    logger.info("RSS 수집 시작: source=%s url=%s limit=%s", source.name, url, limit)
+    try:
+        content = fetcher.get_text(url, respect_delay=False, headers=headers or None)
     except FetchError as exc:
         logger.error("RSS 다운로드 실패: %s", exc)
-        result = CollectResult()
-        result.errors.append((source.url, str(exc)))
+        result.errors.append((url, str(exc)))
         return result
 
     return parse_feed(content, source, limit=limit)

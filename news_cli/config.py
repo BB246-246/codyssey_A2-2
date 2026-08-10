@@ -31,7 +31,15 @@ class ConfigError(Exception):
 
 @dataclass(frozen=True)
 class SourceConfig:
-    """단일 뉴스 소스 설정."""
+    """단일 뉴스 소스 설정.
+
+    `params`와 `auth_header_env`는 인증이 필요한 공개 검색 API(예: 네이버 뉴스 검색
+    API)를 rss 타입으로 다루기 위한 항목이다. RSS 2.0 XML을 돌려주므로 파싱은
+    동일하고, 차이는 쿼리 파라미터와 인증 헤더뿐이다.
+
+    비밀값은 config에 두지 않는다. `auth_header_env`에는 헤더 이름과
+    **환경변수 이름**만 적고, 실제 값은 수집 시점에 환경변수에서 읽는다.
+    """
 
     name: str
     type: str
@@ -43,6 +51,8 @@ class SourceConfig:
     title_selector: str | None = None
     body_selector: str | None = None
     date_selector: str | None = None
+    params: dict[str, Any] = field(default_factory=dict)
+    auth_header_env: dict[str, str] = field(default_factory=dict)
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -118,6 +128,22 @@ def _parse_source(name: str, raw: Any) -> SourceConfig:
                 f"config.example.json을 복사한 뒤 실제 값으로 바꾸세요."
             )
 
+    params = raw.get("params") or {}
+    if not isinstance(params, dict):
+        raise ConfigError(f"{where}의 'params'는 객체(JSON object)여야 합니다.")
+
+    auth_header_env = raw.get("auth_header_env") or {}
+    if not isinstance(auth_header_env, dict):
+        raise ConfigError(
+            f"{where}의 'auth_header_env'는 '헤더이름: 환경변수이름' 형태의 객체여야 합니다."
+        )
+    for header, env_name in auth_header_env.items():
+        if not isinstance(env_name, str) or not env_name.strip():
+            raise ConfigError(
+                f"{where}.auth_header_env.{header}에는 환경변수 '이름'을 적어야 합니다 "
+                f"(비밀값 자체를 적으면 안 됩니다)."
+            )
+
     known = {
         "type",
         "category",
@@ -128,6 +154,8 @@ def _parse_source(name: str, raw: Any) -> SourceConfig:
         "title_selector",
         "body_selector",
         "date_selector",
+        "params",
+        "auth_header_env",
     }
     return SourceConfig(
         name=name,
@@ -140,6 +168,8 @@ def _parse_source(name: str, raw: Any) -> SourceConfig:
         title_selector=raw.get("title_selector"),
         body_selector=raw.get("body_selector"),
         date_selector=raw.get("date_selector"),
+        params={str(k): v for k, v in params.items()},
+        auth_header_env={str(k): str(v).strip() for k, v in auth_header_env.items()},
         extra={k: v for k, v in raw.items() if k not in known},
     )
 

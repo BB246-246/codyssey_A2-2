@@ -86,7 +86,10 @@ def normalize_text(text: str | None) -> str:
     """Unicode(NFKC)/공백/개행을 정규화하고 HTML 엔티티를 해제한다."""
     if not text:
         return ""
-    value = strip_html(text)
+    # 엔티티를 먼저 푼 뒤 태그를 제거한다. 네이버 뉴스 검색 API처럼 태그를
+    # '&lt;b&gt;'로 이중 인코딩해 주는 소스에서도 태그가 본문에 남지 않는다.
+    value = html.unescape(text)
+    value = strip_html(value)
     value = html.unescape(value)
     value = unicodedata.normalize("NFKC", value)
     value = value.replace("\r\n", "\n").replace("\r", "\n")
@@ -167,6 +170,19 @@ def normalize_date(value: Any) -> str | None:
             return to_iso(datetime.strptime(text, fmt))
         except ValueError:
             continue
+
+    # 잡음이 섞인 문자열에서 날짜만 추출 (예: "반도체 입력 :2026/08/10 00:41 수정: ...")
+    for pattern, fmt in (
+        (r"\d{4}[./-]\d{1,2}[./-]\d{1,2}[ T]\d{1,2}:\d{2}", "%Y-%m-%d %H:%M"),
+        (r"\d{4}[./-]\d{1,2}[./-]\d{1,2}", "%Y-%m-%d"),
+    ):
+        match = re.search(pattern, text)
+        if match:
+            candidate = re.sub(r"[./]", "-", match.group(0), count=2).replace("T", " ")
+            try:
+                return to_iso(datetime.strptime(candidate, fmt))
+            except ValueError:
+                continue
 
     # "Thursday, June 15, 2006 (extra text)" 같은 경우 앞부분만 재시도
     match = re.search(r"[A-Z][a-z]+ \d{1,2}, \d{4}", text)

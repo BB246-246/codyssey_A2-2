@@ -81,7 +81,10 @@ def parse_article_html(markup: str, source: SourceConfig, url: str) -> Collected
     if source.date_selector:
         node = soup.select_one(source.date_selector)
         if node is not None:
-            published = node.get("datetime") or node.get_text(" ", strip=True)
+            # <time datetime>, <meta content>, 일반 텍스트 순으로 시도한다.
+            published = (
+                node.get("datetime") or node.get("content") or node.get_text(" ", strip=True)
+            )
     if not published:
         meta = soup.select_one('meta[property="article:published_time"]') or soup.select_one(
             'meta[name="date"]'

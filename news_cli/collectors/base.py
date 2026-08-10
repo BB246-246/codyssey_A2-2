@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 import urllib.robotparser as robotparser
 from dataclasses import dataclass, field
@@ -137,17 +138,29 @@ class HttpFetcher:
             logger.debug("요청 간 대기 %.2fs", remaining)
             time.sleep(remaining)
 
-    def get(self, url: str, *, respect_delay: bool = True) -> requests.Response:
-        """GET 요청. 실패 시 FetchError를 던진다."""
+    def get(
+        self,
+        url: str,
+        *,
+        respect_delay: bool = True,
+        headers: dict[str, str] | None = None,
+    ) -> requests.Response:
+        """GET 요청. 실패 시 FetchError를 던진다.
+
+        `headers`는 인증 헤더처럼 요청별로 다른 값을 넘길 때 사용한다.
+        값은 로그에 남기지 않는다(헤더 이름만 기록).
+        """
         if not self.is_allowed(url):
             raise RobotsDisallowed(f"robots.txt가 수집을 허용하지 않습니다: {url}")
 
         if respect_delay:
             self._sleep_if_needed()
 
+        if headers:
+            logger.debug("요청 헤더 추가: %s", ", ".join(sorted(headers)))
         logger.debug("GET %s (timeout=%.1fs)", url, self.timeout)
         try:
-            response = self.session.get(url, timeout=self.timeout)
+            response = self.session.get(url, timeout=self.timeout, headers=headers or None)
         except requests.Timeout as exc:
             raise FetchError(f"요청 시간 초과({self.timeout}s): {url}") from exc
         except requests.RequestException as exc:
@@ -159,8 +172,14 @@ class HttpFetcher:
             raise FetchError(f"HTTP {response.status_code} 응답: {url}")
         return response
 
-    def get_text(self, url: str, *, respect_delay: bool = True) -> str:
-        response = self.get(url, respect_delay=respect_delay)
+    def get_text(
+        self,
+        url: str,
+        *,
+        respect_delay: bool = True,
+        headers: dict[str, str] | None = None,
+    ) -> str:
+        response = self.get(url, respect_delay=respect_delay, headers=headers)
         if not response.encoding or response.encoding.lower() == "iso-8859-1":
             response.encoding = response.apparent_encoding or "utf-8"
         return response.text
@@ -170,6 +189,36 @@ class HttpFetcher:
             self.session.close()
         except Exception:  # pragma: no cover
             pass
+
+
+def resolve_auth_headers(source: Any) -> dict[str, str]:
+    """source.auth_header_env의 '환경변수 이름'을 실제 값으로 바꾼다.
+
+    비밀값은 config가 아니라 환경변수에만 존재한다. 값이 없으면 어떤 변수를
+    설정해야 하는지 알려주는 FetchError를 던진다(값 자체는 절대 로그·예외에 넣지 않는다).
+    """
+    mapping = getattr(source, "auth_header_env", None) or {}
+    headers: dict[str, str] = {}
+    missing: list[str] = []
+
+    for header, env_name in mapping.items():
+        value = os.environ.get(env_name, "").strip()
+        if not value:
+            missing.append(env_name)
+        else:
+            headers[header] = value
+
+    if missing:
+        names = ", ".join(missing)
+        raise FetchError(
+            f"소스 '{getattr(source, 'name', '?')}'에 필요한 환경변수가 설정되어 있지 않습니다: {names}\n"
+            f"  PowerShell:  setx {missing[0]} \"<발급받은 값>\"  (설정 후 새 터미널에서 실행)\n"
+            f"  bash:        export {missing[0]}='<발급받은 값>'"
+        )
+
+    if headers:
+        logger.info("인증 헤더 %d개를 환경변수에서 읽었습니다: %s", len(headers), ", ".join(sorted(headers)))
+    return headers
 
 
 def build_fetcher(config: Any, *, session: requests.Session | None = None) -> HttpFetcher:

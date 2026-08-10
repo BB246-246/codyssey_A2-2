@@ -160,3 +160,23 @@ def make_raw(
 @pytest.fixture
 def make_raw_article():
     return make_raw
+
+@pytest.fixture
+def sample_naver_xml() -> str:
+    return (FIXTURES / "sample_naver_news.xml").read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def naver_source() -> SourceConfig:
+    """네이버 뉴스 검색 API 형태의 rss 소스 (인증 헤더 + 쿼리 파라미터)."""
+    return SourceConfig(
+        name="naver_news",
+        type="rss",
+        category="AI",
+        url="https://openapi.naver.test/v1/search/news.xml",
+        params={"query": "AI", "display": 20, "sort": "date"},
+        auth_header_env={
+            "X-Naver-Client-Id": "NAVER_CLIENT_ID",
+            "X-Naver-Client-Secret": "NAVER_CLIENT_SECRET",
+        },
+    )

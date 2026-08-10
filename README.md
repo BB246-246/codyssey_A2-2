@@ -76,6 +76,8 @@ cp config.example.json config.json
 | `respect_robots_txt` | `true`면 robots.txt를 확인하고 금지된 URL은 요청하지 않음 |
 | `max_analysis_articles` / `max_analysis_chars` | analyze 입력 상한(안전장치) |
 | `sources.<name>` | 소스 정의. `type`이 `rss`면 `url`, `web`이면 `list_url`과 CSS 선택자들 |
+| `sources.<name>.params` | rss 소스의 쿼리 파라미터. 검색형 API용 (예: `query`, `display`, `sort`) |
+| `sources.<name>.auth_header_env` | `헤더이름: 환경변수이름` 매핑. **비밀값이 아니라 환경변수 이름만** 적습니다 |
 
 **선택자는 전부 config에서 읽습니다.** 대상 사이트 구조가 바뀌어도
 `article_link_selector` / `title_selector` / `body_selector` / `date_selector`만 고치면 되고,
@@ -86,6 +88,19 @@ collector 외부 모듈은 손대지 않아도 됩니다.
 ```bash
 python main.py --config config.staging.json fetch --method rss --source default_rss
 ```
+
+### 수집 소스 인증 (네이버 뉴스 검색 API)
+
+기본 `default_rss`는 네이버 뉴스 검색 API를 씁니다. [네이버 개발자 센터](https://developers.naver.com/apps/#/register)에서
+애플리케이션을 등록하고 발급받은 값을 환경변수로 설정하세요. config에는 환경변수 **이름만** 들어갑니다.
+
+```powershell
+setx NAVER_CLIENT_ID     "<Client ID>"
+setx NAVER_CLIENT_SECRET "<Client Secret>"
+```
+
+`setx`는 새로 여는 터미널부터 적용됩니다. 값이 없으면 어떤 변수를 설정해야 하는지 알려주고 종료합니다.
+크롤링 소스(`default_web`)는 인증이 필요 없습니다.
 
 ## 5. AI 환경변수
 
@@ -224,7 +239,7 @@ python main.py --config config.json --log-level DEBUG fetch --method rss --sourc
 | --- | --- | --- |
 | 장점 | 구조화된 데이터, 파싱이 안정적, 사이트 변경에 강함, 제공자가 명시적으로 허용 | 제공되는 피드가 없어도 수집 가능, 본문 전문 확보 가능 |
 | 단점 | 본문이 없거나 요약만 오는 경우가 많음, 제공 항목 수 제한, 피드가 없는 사이트는 불가 | HTML 구조 변경에 취약, 요청 수가 많고 느림, 정책·저작권 확인 필수 |
-| 이 프로젝트 | `default_rss`(Hacker News RSS) — 제목·링크·요약 확보 | `default_web`(English Wikinews) — 본문 전문 확보 |
+| 이 프로젝트 | `default_rss`(네이버 뉴스 검색 API) — 최신 한국어 기사 목록과 요약 스니펫 | `default_web`(ZDNet Korea) — 기사 본문 전문 확보 |
 
 실무에서는 **RSS를 우선 쓰고, 본문이 필요할 때만 크롤링을 보조로** 쓰는 조합이 안전합니다.
 이 프로젝트도 그 구성을 기본값으로 삼았습니다.
@@ -261,12 +276,16 @@ python main.py --config config.json --log-level DEBUG fetch --method rss --sourc
 
 | 소스 | URL | 확인 결과 |
 | --- | --- | --- |
-| `default_rss` | `https://hnrss.org/frontpage` | `hnrss.org/robots.txt` → `User-agent: * / Disallow:` (전면 허용). Hacker News가 공개한 콘텐츠를 RSS로 재배포하는 공개 서비스입니다. |
-| `ai_rss` | `https://hnrss.org/newest?q=AI&count=25` | 위와 동일 |
-| `default_web` | `https://en.wikinews.org/wiki/Category:Science_and_technology` | Wikimedia robots.txt의 `User-agent: *` 블록은 `/w/`, `/api/`, `/wiki/Special:` 등을 금지하고 **`/wiki/` 일반 문서는 허용**합니다. Wikinews 본문은 CC BY 2.5 라이선스로 재사용이 명시적으로 허용됩니다. |
+| `default_rss`, `naver_it` | `https://openapi.naver.com/v1/search/news.xml` | 네이버가 공식 제공하는 **공개 검색 API**입니다. robots.txt 대상이 아니라 API 이용약관을 따릅니다. 애플리케이션 등록 후 발급받은 Client ID/Secret이 필요하며, 응답은 RSS 2.0 XML입니다. |
+| `default_web` | `https://zdnet.co.kr/news/?lstcode=0050` | `zdnet.co.kr/robots.txt`가 해당 경로를 허용합니다(코드가 매 실행 시 확인). 정적 HTML이라 BeautifulSoup으로 본문을 추출할 수 있습니다. |
 
-명시적으로 **제외**한 후보: `www.bbc.co.uk`(robots.txt가 스크래핑·요약·AI 학습을 명시적으로 금지),
-`text.npr.org`(`Disallow: /`).
+명시적으로 **제외**한 후보:
+
+- `news.naver.com`, `n.news.naver.com` — robots.txt가 `User-agent: * / Disallow: /`이고 AI 학습·RAG
+  목적의 봇 접근을 금지한다고 명시합니다. **네이버 뉴스는 API로만 쓰고 본문 크롤링은 하지 않습니다.**
+- `www.bbc.co.uk` — robots.txt가 스크래핑·요약·AI 학습을 명시적으로 금지
+- `text.npr.org` — `Disallow: /`
+- `www.korea.kr` — robots는 허용하지만 본문이 JavaScript로 로드돼 정적 크롤러로는 추출 불가
 
 구현상 지켜지는 규칙:
 
