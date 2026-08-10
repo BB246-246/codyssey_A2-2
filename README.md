@@ -95,11 +95,20 @@ python main.py --config config.staging.json fetch --method rss --source default_
 애플리케이션을 등록하고 발급받은 값을 환경변수로 설정하세요. config에는 환경변수 **이름만** 들어갑니다.
 
 ```powershell
-setx NAVER_CLIENT_ID     "<Client ID>"
-setx NAVER_CLIENT_SECRET "<Client Secret>"
+setx NAVER_CLIENT_ID     abcd1234EFGH5678ijkl
+setx NAVER_CLIENT_SECRET AbCdEfGhIj
 ```
 
-`setx`는 새로 여는 터미널부터 적용됩니다. 값이 없으면 어떤 변수를 설정해야 하는지 알려주고 종료합니다.
+위 값은 **형식 예시**입니다. 꺾쇠(`< >`)나 따옴표 없이 발급받은 실제 값만 넣으세요.
+자리표시자를 그대로 넣으면 수집 시 그 사실을 알려주고 중단합니다.
+
+애플리케이션에 **"검색" API를 추가**해야 합니다. 추가하지 않으면 키가 맞아도
+`Scope Status Invalid` 401이 돌아옵니다.
+
+`setx`는 **새로 시작하는 프로세스**부터 적용됩니다. VS Code에서 터미널만 새로 열면
+편집기가 옛 환경을 물려주므로 반영되지 않습니다. **VS Code를 완전히 재시작**하거나,
+그 세션에서만 쓰려면 `$env:NAVER_CLIENT_ID = "..."`로 설정하세요.
+
 크롤링 소스(`default_web`)는 인증이 필요 없습니다.
 
 ## 5. AI 환경변수
